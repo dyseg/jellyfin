@@ -212,5 +212,7 @@ namespace MediaBrowser.Model.IO
         /// <param name="path">The path.</param>
         /// <returns>Whether the path exists.</returns>
         bool FileExists(string path);
+
+        IEqualityComparer<string> AreEqualComparer();
     }
 }

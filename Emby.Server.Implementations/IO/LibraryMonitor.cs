@@ -121,7 +121,7 @@ namespace Emby.Server.Implementations.IO
                 .Where(IsLibraryMonitorEnabled)
                 .OfType<Folder>()
                 .SelectMany(f => f.PhysicalLocations)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Distinct(_fileSystem.AreEqualComparer())
                 .Order();
 
             foreach (var path in paths)

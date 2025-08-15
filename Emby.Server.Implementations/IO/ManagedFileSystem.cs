@@ -690,5 +690,47 @@ namespace Emby.Server.Implementations.IO
                 AttributesToSkip = 0
             };
         }
+
+    /// <summary>
+    /// Creates an equality comparer for paths.
+    /// </summary>
+    /// <returns>An <see cref="IEqualityComparer{T}"/> that compares paths.</returns>
+        public IEqualityComparer<string> AreEqualComparer()
+        {
+            return new PathEqualityComparer(this);
+        }
+
+        private class PathEqualityComparer : IEqualityComparer<string>
+        {
+            private readonly ManagedFileSystem _fileSystem;
+
+            public PathEqualityComparer(ManagedFileSystem fileSystem)
+            {
+                _fileSystem = fileSystem;
+            }
+
+            public bool Equals(string? x, string? y)
+            {
+                if (x is null || y is null)
+                {
+                    return false;
+                }
+
+                return _fileSystem.AreEqual(x, y);
+            }
+
+            public int GetHashCode(string obj)
+            {
+                if (obj is null)
+                {
+                    return 0;
+                }
+
+                var trimmed = Path.TrimEndingDirectorySeparator(obj);
+                return _isEnvironmentCaseInsensitive
+                    ? StringComparer.OrdinalIgnoreCase.GetHashCode(trimmed)
+                    : StringComparer.Ordinal.GetHashCode(trimmed);
+            }
+        }
     }
 }
