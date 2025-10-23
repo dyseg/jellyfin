@@ -87,4 +87,9 @@ public class PlaybackInfoDto
     /// Gets or sets a value indicating whether always burn in subtitles when transcoding.
     /// </summary>
     public bool? AlwaysBurnInSubtitleWhenTranscoding { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether to require audio dynamic range compression.
+    /// </summary>
+    public bool? RequireAudioDynamicRange { get; set; }
 }
