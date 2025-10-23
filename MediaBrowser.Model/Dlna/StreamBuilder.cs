@@ -20,7 +20,7 @@ namespace MediaBrowser.Model.Dlna
     {
         // Aliases
         internal const TranscodeReason ContainerReasons = TranscodeReason.ContainerNotSupported | TranscodeReason.ContainerBitrateExceedsLimit;
-        internal const TranscodeReason AudioCodecReasons = TranscodeReason.AudioBitrateNotSupported | TranscodeReason.AudioChannelsNotSupported | TranscodeReason.AudioProfileNotSupported | TranscodeReason.AudioSampleRateNotSupported | TranscodeReason.SecondaryAudioNotSupported | TranscodeReason.AudioBitDepthNotSupported | TranscodeReason.AudioIsExternal;
+        internal const TranscodeReason AudioCodecReasons = TranscodeReason.AudioBitrateNotSupported | TranscodeReason.AudioChannelsNotSupported | TranscodeReason.AudioProfileNotSupported | TranscodeReason.AudioSampleRateNotSupported | TranscodeReason.SecondaryAudioNotSupported | TranscodeReason.AudioBitDepthNotSupported | TranscodeReason.AudioIsExternal | TranscodeReason.RequireAudioDynamicRange;
         internal const TranscodeReason AudioReasons = TranscodeReason.AudioCodecNotSupported | AudioCodecReasons;
         internal const TranscodeReason VideoCodecReasons = TranscodeReason.VideoResolutionNotSupported | TranscodeReason.AnamorphicVideoNotSupported | TranscodeReason.InterlacedVideoNotSupported | TranscodeReason.VideoBitDepthNotSupported | TranscodeReason.VideoBitrateNotSupported | TranscodeReason.VideoFramerateNotSupported | TranscodeReason.VideoLevelNotSupported | TranscodeReason.RefFramesNotSupported | TranscodeReason.VideoRangeTypeNotSupported | TranscodeReason.VideoProfileNotSupported;
         internal const TranscodeReason VideoReasons = TranscodeReason.VideoCodecNotSupported | VideoCodecReasons;
@@ -107,6 +107,11 @@ namespace MediaBrowser.Model.Dlna
 
             var directPlayMethod = directPlayInfo.PlayMethod;
             var transcodeReasons = directPlayInfo.TranscodeReasons;
+
+            if (options.RequireAudioDynamicRange)
+            {
+                transcodeReasons |= TranscodeReason.RequireAudioDynamicRange;
+            }
 
             if (directPlayMethod is PlayMethod.DirectPlay)
             {
@@ -387,6 +392,8 @@ namespace MediaBrowser.Model.Dlna
                 case ProfileConditionValue.Width:
                     return TranscodeReason.VideoResolutionNotSupported;
 
+                case ProfileConditionValue.RequireAudioDynamicRange:
+                    return TranscodeReason.RequireAudioDynamicRange;
                 default:
                     return 0;
             }
@@ -705,8 +712,8 @@ namespace MediaBrowser.Model.Dlna
 
             var bitrateLimitExceeded = IsBitrateLimitExceeded(item, options.GetMaxBitrate(false) ?? 0);
             var isEligibleForDirectPlay = options.EnableDirectPlay && (options.ForceDirectPlay || !bitrateLimitExceeded);
-            var isEligibleForDirectStream = options.EnableDirectStream && (options.ForceDirectStream || !bitrateLimitExceeded);
-            TranscodeReason transcodeReasons = 0;
+            var isEligibleForDirectStream = options.EnableDirectStream && (options.ForceDirectStream || !bitrateLimitExceeded) && !options.RequireAudioDynamicRange;
+            TranscodeReason transcodeReasons = options.RequireAudioDynamicRange ? TranscodeReason.RequireAudioDynamicRange : 0;
 
             // Force transcode or remux for BD/DVD folders
             if (item.VideoType == VideoType.Dvd || item.VideoType == VideoType.BluRay)
@@ -716,7 +723,7 @@ namespace MediaBrowser.Model.Dlna
 
             if (bitrateLimitExceeded)
             {
-                transcodeReasons = TranscodeReason.ContainerBitrateExceedsLimit;
+                transcodeReasons |= TranscodeReason.ContainerBitrateExceedsLimit;
             }
 
             _logger.LogDebug(
@@ -2369,6 +2376,19 @@ namespace MediaBrowser.Model.Dlna
             var audioFailureConditions = isVideo
                 ? GetProfileConditionsForVideoAudio(profile.CodecProfiles, container, audioCodec, audioChannels, audioBitrate, audioSampleRate, audioBitDepth, audioProfile, isSecondaryAudio)
                 : GetProfileConditionsForAudio(profile.CodecProfiles, container, audioCodec, audioChannels, audioBitrate, audioSampleRate, audioBitDepth, true);
+
+            if (!isVideo)
+            {
+                if (options.RequireAudioDynamicRange)
+                {
+                    audioFailureConditions = audioFailureConditions.Append(new ProfileCondition
+                    {
+                        Condition = ProfileConditionType.Equals,
+                        Value = "true",
+                        Property = ProfileConditionValue.RequireAudioDynamicRange,
+                    });
+                }
+            }
 
             var failures = AggregateFailureConditions(mediaSource, profile, "AudioCodecProfile", audioFailureConditions);
 

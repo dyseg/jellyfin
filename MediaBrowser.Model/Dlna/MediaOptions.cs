@@ -113,6 +113,11 @@ namespace MediaBrowser.Model.Dlna
         public int? SubtitleStreamIndex { get; set; }
 
         /// <summary>
+        /// Gets or sets a value indicating whether to require audio dynamic range compression.
+        /// </summary>
+        public bool RequireAudioDynamicRange { get; set; }
+
+        /// <summary>
         /// Gets the maximum bitrate.
         /// </summary>
         /// <param name="isAudio">Whether or not this is audio.</param>
