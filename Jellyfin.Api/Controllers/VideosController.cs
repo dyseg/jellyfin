@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
+using ICU4N.Logging;
 using Jellyfin.Api.Attributes;
 using Jellyfin.Api.Extensions;
 using Jellyfin.Api.Helpers;
@@ -369,6 +371,7 @@ public class VideosController : BaseJellyfinApiController
         [FromQuery] bool requireAudioDynamicRange,
         [FromQuery] bool enableAudioVbrEncoding = true)
     {
+        Trace.WriteLine($"{nameof(requireAudioDynamicRange)}: {requireAudioDynamicRange}");
         var isHeadRequest = Request.Method == System.Net.WebRequestMethods.Http.Head;
         // CTS lifecycle is managed internally.
         var cancellationTokenSource = new CancellationTokenSource();
@@ -550,6 +553,7 @@ public class VideosController : BaseJellyfinApiController
     /// <param name="videoStreamIndex">Optional. The index of the video stream to use. If omitted the first video stream will be used.</param>
     /// <param name="context">Optional. The <see cref="EncodingContext"/>.</param>
     /// <param name="streamOptions">Optional. The streaming options.</param>
+    /// <param name="requireAudioDynamicRange">Optional. Whether to dynamically normalize volume.</param>
     /// <param name="enableAudioVbrEncoding">Optional. Whether to enable Audio Encoding.</param>
     /// <response code="200">Video stream returned.</response>
     /// <returns>A <see cref="FileResult"/> containing the audio file.</returns>
@@ -609,6 +613,7 @@ public class VideosController : BaseJellyfinApiController
         [FromQuery] int? videoStreamIndex,
         [FromQuery] EncodingContext? context,
         [FromQuery] Dictionary<string, string> streamOptions,
+        [FromQuery] bool requireAudioDynamicRange,
         [FromQuery] bool enableAudioVbrEncoding = true)
     {
         return GetVideoStream(
@@ -663,6 +668,7 @@ public class VideosController : BaseJellyfinApiController
             videoStreamIndex,
             context,
             streamOptions,
+            requireAudioDynamicRange,
             enableAudioVbrEncoding);
     }
 }

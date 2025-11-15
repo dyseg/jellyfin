@@ -2377,17 +2377,14 @@ namespace MediaBrowser.Model.Dlna
                 ? GetProfileConditionsForVideoAudio(profile.CodecProfiles, container, audioCodec, audioChannels, audioBitrate, audioSampleRate, audioBitDepth, audioProfile, isSecondaryAudio)
                 : GetProfileConditionsForAudio(profile.CodecProfiles, container, audioCodec, audioChannels, audioBitrate, audioSampleRate, audioBitDepth, true);
 
-            if (!isVideo)
+            if (options.RequireAudioDynamicRange)
             {
-                if (options.RequireAudioDynamicRange)
+                audioFailureConditions = audioFailureConditions.Append(new ProfileCondition
                 {
-                    audioFailureConditions = audioFailureConditions.Append(new ProfileCondition
-                    {
-                        Condition = ProfileConditionType.Equals,
-                        Value = "true",
-                        Property = ProfileConditionValue.RequireAudioDynamicRange,
-                    });
-                }
+                    Condition = ProfileConditionType.Equals,
+                    Value = "true",
+                    Property = ProfileConditionValue.RequireAudioDynamicRange,
+                });
             }
 
             var failures = AggregateFailureConditions(mediaSource, profile, "AudioCodecProfile", audioFailureConditions);
