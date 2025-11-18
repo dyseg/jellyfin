@@ -242,7 +242,8 @@ public class MediaInfoController : BaseJellyfinApiController
                         SubtitleStreamIndex = subtitleStreamIndex,
                         UserId = userId ?? Guid.Empty,
                         OpenToken = mediaSource.OpenToken,
-                        AlwaysBurnInSubtitleWhenTranscoding = playbackInfoDto?.AlwaysBurnInSubtitleWhenTranscoding ?? false
+                        AlwaysBurnInSubtitleWhenTranscoding = playbackInfoDto?.AlwaysBurnInSubtitleWhenTranscoding ?? false,
+                        RequireAudioDynamicRangeCompression = requireAudioDynamicRange.Value
                     }).ConfigureAwait(false);
 
                 info.MediaSources = new[] { openStreamResult.MediaSource };

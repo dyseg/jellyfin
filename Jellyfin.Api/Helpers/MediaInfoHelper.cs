@@ -448,7 +448,7 @@ public class MediaInfoHelper
                 true,
                 true,
                 request.AlwaysBurnInSubtitleWhenTranscoding,
-                true,
+                request.RequireAudioDynamicRangeCompression,
                 httpContext.GetNormalizedRemoteIP());
         }
         else

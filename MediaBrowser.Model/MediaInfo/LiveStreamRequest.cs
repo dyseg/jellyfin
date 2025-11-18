@@ -44,5 +44,7 @@ namespace MediaBrowser.Model.MediaInfo
         public bool AlwaysBurnInSubtitleWhenTranscoding { get; set; }
 
         public IReadOnlyList<MediaProtocol> DirectPlayProtocols { get; set; }
+
+        public bool RequireAudioDynamicRangeCompression { get; set; }
     }
 }

@@ -2493,7 +2493,7 @@ namespace MediaBrowser.Controller.MediaEncoding
         {
             var request = state.BaseRequest;
 
-            if (!request.AllowAudioStreamCopy)
+            if (!request.AllowAudioStreamCopy || request.RequireAudioDynamicRange)
             {
                 return false;
             }
