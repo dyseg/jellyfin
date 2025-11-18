@@ -711,7 +711,7 @@ namespace MediaBrowser.Model.Dlna
             var videoStream = item.VideoStream;
 
             var bitrateLimitExceeded = IsBitrateLimitExceeded(item, options.GetMaxBitrate(false) ?? 0);
-            var isEligibleForDirectPlay = options.EnableDirectPlay && (options.ForceDirectPlay || !bitrateLimitExceeded);
+            var isEligibleForDirectPlay = options.EnableDirectPlay && (options.ForceDirectPlay || !bitrateLimitExceeded) && !options.RequireAudioDynamicRange;
             var isEligibleForDirectStream = options.EnableDirectStream && (options.ForceDirectStream || !bitrateLimitExceeded) && !options.RequireAudioDynamicRange;
             TranscodeReason transcodeReasons = options.RequireAudioDynamicRange ? TranscodeReason.RequireAudioDynamicRange : 0;
 
