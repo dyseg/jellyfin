@@ -580,6 +580,12 @@ namespace Emby.Naming.Common
                     MediaType.Video),
 
                 new ExtraRule(
+                    ExtraType.Sample,
+                    ExtraRuleType.Filename,
+                    "minta",
+                    MediaType.Video),
+
+                new ExtraRule(
                     ExtraType.ThemeSong,
                     ExtraRuleType.Filename,
                     "theme",
@@ -617,6 +623,18 @@ namespace Emby.Naming.Common
 
                 new ExtraRule(
                     ExtraType.Sample,
+                    ExtraRuleType.Prefix,
+                    "sample-",
+                    MediaType.Video),
+
+                new ExtraRule(
+                    ExtraType.Sample,
+                    ExtraRuleType.Prefix,
+                    "sample_",
+                    MediaType.Video),
+
+                new ExtraRule(
+                    ExtraType.Sample,
                     ExtraRuleType.Suffix,
                     ".sample",
                     MediaType.Video),
@@ -631,6 +649,24 @@ namespace Emby.Naming.Common
                     ExtraType.Sample,
                     ExtraRuleType.Suffix,
                     "- sample",
+                    MediaType.Video),
+
+                new ExtraRule(
+                    ExtraType.Sample,
+                    ExtraRuleType.Prefix,
+                    "minta -",
+                    MediaType.Video),
+
+                new ExtraRule(
+                    ExtraType.Sample,
+                    ExtraRuleType.Prefix,
+                    "minta-",
+                    MediaType.Video),
+
+                new ExtraRule(
+                    ExtraType.Sample,
+                    ExtraRuleType.Suffix,
+                    "-minta",
                     MediaType.Video),
 
                 new ExtraRule(
