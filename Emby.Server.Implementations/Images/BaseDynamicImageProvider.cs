@@ -285,6 +285,16 @@ namespace Emby.Server.Implementations.Images
                 }
             }
 
+            List<string> toSkip = ["hundub.hunsub", "Covers", "commentary", "hun", "HunDub",
+            "HunSubs", "HUN", "hundub", "Hundub", "Hunsub", "Sub", "HANG.FELIRAT", "Hun",
+            "proof", "SUB", "ENG", "FORCED", "FULL",
+            "HuN", "EnG", "magyar feliratok", "magyar szinkron", "sub", "HunSub", "Proof",
+            "Captures", "Hun.Sub", "HUNDUB", "EngDub", "HuNSuB"];
+            if (toSkip.Contains(item.Name, StringComparer.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
             return true;
         }
 
