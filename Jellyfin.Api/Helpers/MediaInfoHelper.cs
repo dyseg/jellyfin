@@ -166,6 +166,7 @@ public class MediaInfoHelper
     /// <param name="allowVideoStreamCopy">Allow video stream copy.</param>
     /// <param name="allowAudioStreamCopy">Allow audio stream copy.</param>
     /// <param name="alwaysBurnInSubtitleWhenTranscoding">Always burn-in subtitle when transcoding.</param>
+    /// <param name="requireAudioDynamicRange">Require audio dynamic range compression.</param>
     /// <param name="ipAddress">Requesting IP address.</param>
     public void SetDeviceSpecificData(
         BaseItem item,
@@ -186,6 +187,7 @@ public class MediaInfoHelper
         bool allowVideoStreamCopy,
         bool allowAudioStreamCopy,
         bool alwaysBurnInSubtitleWhenTranscoding,
+        bool requireAudioDynamicRange,
         IPAddress ipAddress)
     {
         var streamBuilder = new StreamBuilder(_mediaEncoder, _logger);
@@ -201,6 +203,7 @@ public class MediaInfoHelper
             AllowAudioStreamCopy = allowAudioStreamCopy,
             AllowVideoStreamCopy = allowVideoStreamCopy,
             AlwaysBurnInSubtitleWhenTranscoding = alwaysBurnInSubtitleWhenTranscoding,
+            RequireAudioDynamicRange = requireAudioDynamicRange
         };
 
         if (string.Equals(mediaSourceId, mediaSource.Id, StringComparison.OrdinalIgnoreCase))
@@ -326,6 +329,11 @@ public class MediaInfoHelper
                     {
                         mediaSource.TranscodingUrl += "&alwaysBurnInSubtitleWhenTranscoding=true";
                     }
+
+                    if (options.RequireAudioDynamicRange)
+                    {
+                        mediaSource.TranscodingUrl += "&requireAudioDynamicRange=true";
+                    }
                 }
             }
 
@@ -449,6 +457,7 @@ public class MediaInfoHelper
                 true,
                 true,
                 request.AlwaysBurnInSubtitleWhenTranscoding,
+                request.RequireAudioDynamicRangeCompression,
                 httpContext.GetNormalizedRemoteIP());
         }
         else

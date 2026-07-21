@@ -2632,6 +2632,7 @@ namespace MediaBrowser.Controller.MediaEncoding
 
             return request.AllowAudioStreamCopy
                 && request.EnableAutoStreamCopy
+                && !request.RequireAudioDynamicRange
                 && failureReasons == 0;
         }
 
@@ -2922,7 +2923,7 @@ namespace MediaBrowser.Controller.MediaEncoding
                     filters.Add(downMixFilterString);
                 }
 
-                if (!encodingOptions.DownMixAudioBoost.Equals(1))
+                if (!encodingOptions.DownMixAudioBoost.Equals(1) && !state.BaseRequest.RequireAudioDynamicRange)
                 {
                     filters.Add("volume=" + encodingOptions.DownMixAudioBoost.ToString(CultureInfo.InvariantCulture));
                 }
@@ -2938,6 +2939,11 @@ namespace MediaBrowser.Controller.MediaEncoding
                         CultureInfo.InvariantCulture,
                         "asetpts=PTS-{0}/TB",
                         Math.Round(seconds)));
+            }
+
+            if (state.BaseRequest.RequireAudioDynamicRange)
+            {
+                filters.Add("acompressor=threshold=-28.5dB:ratio=4:attack=25:release=100:knee=5:makeup=6dB");
             }
 
             if (filters.Count > 0)

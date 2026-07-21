@@ -15,6 +15,7 @@ namespace MediaBrowser.Model.Session
         AudioIsExternal = 1 << 4,
         SecondaryAudioNotSupported = 1 << 5,
         StreamCountExceedsLimit = 1 << 26,
+        RequireAudioDynamicRange = 1 << 27,
 
         // Video Constraints
         VideoProfileNotSupported = 1 << 6,

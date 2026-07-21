@@ -47,6 +47,7 @@ namespace Emby.Naming.Video
                 {
                     ExtraRuleType.Filename => fileNameWithoutExtension.Equals(rule.Token, StringComparison.OrdinalIgnoreCase),
                     ExtraRuleType.Suffix => trimmedFileNameWithoutExtension.EndsWith(rule.Token, StringComparison.OrdinalIgnoreCase),
+                    ExtraRuleType.Prefix => trimmedFileNameWithoutExtension.StartsWith(rule.Token, StringComparison.OrdinalIgnoreCase),
                     ExtraRuleType.Regex => Regex.IsMatch(fileName, rule.Token, RegexOptions.IgnoreCase | RegexOptions.Compiled),
                     ExtraRuleType.DirectoryName => directoryName.Equals(rule.Token, StringComparison.OrdinalIgnoreCase)
                                                  && !string.Equals(fullDirectory, libraryRoot, StringComparison.OrdinalIgnoreCase),

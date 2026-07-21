@@ -199,6 +199,8 @@ namespace MediaBrowser.Controller.MediaEncoding
 
         public bool AlwaysBurnInSubtitleWhenTranscoding { get; set; }
 
+        public bool RequireAudioDynamicRange { get; set; }
+
         public string GetOption(string qualifier, string name)
         {
             var value = GetOption(qualifier + "-" + name);

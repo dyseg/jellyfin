@@ -23,6 +23,11 @@ namespace Emby.Naming.Video
         /// <summary>
         /// Match <see cref="ExtraRule.Token"/> against the name of the directory containing the file.
         /// </summary>
-        DirectoryName = 3
+        DirectoryName = 3,
+
+        /// <summary>
+        /// Match <see cref="ExtraRule.Token"/> against a prefix in the file name.
+        /// </summary>
+        Prefix = 4
     }
 }

@@ -308,6 +308,7 @@ public class VideosController : BaseJellyfinApiController
     /// <param name="videoStreamIndex">Optional. The index of the video stream to use. If omitted the first video stream will be used.</param>
     /// <param name="context">Optional. The <see cref="EncodingContext"/>.</param>
     /// <param name="streamOptions">Optional. The streaming options.</param>
+    /// <param name="requireAudioDynamicRange">Optional. Whether to dynamically normalize volume.</param>
     /// <param name="enableAudioVbrEncoding">Optional. Whether to enable Audio Encoding.</param>
     /// <response code="200">Video stream returned.</response>
     /// <returns>A <see cref="FileResult"/> containing the audio file.</returns>
@@ -366,6 +367,7 @@ public class VideosController : BaseJellyfinApiController
         [FromQuery] int? videoStreamIndex,
         [FromQuery] EncodingContext? context,
         [FromQuery] Dictionary<string, string> streamOptions,
+        [FromQuery] bool requireAudioDynamicRange,
         [FromQuery] bool enableAudioVbrEncoding = true)
     {
         var isHeadRequest = Request.Method == System.Net.WebRequestMethods.Http.Head;
@@ -422,7 +424,8 @@ public class VideosController : BaseJellyfinApiController
             VideoStreamIndex = videoStreamIndex,
             Context = context ?? EncodingContext.Streaming,
             StreamOptions = streamOptions,
-            EnableAudioVbrEncoding = enableAudioVbrEncoding
+            EnableAudioVbrEncoding = enableAudioVbrEncoding,
+            RequireAudioDynamicRange = requireAudioDynamicRange
         };
 
         var state = await StreamingHelpers.GetStreamingState(
@@ -546,6 +549,7 @@ public class VideosController : BaseJellyfinApiController
     /// <param name="videoStreamIndex">Optional. The index of the video stream to use. If omitted the first video stream will be used.</param>
     /// <param name="context">Optional. The <see cref="EncodingContext"/>.</param>
     /// <param name="streamOptions">Optional. The streaming options.</param>
+    /// <param name="requireAudioDynamicRange">Optional. Whether to dynamically normalize volume.</param>
     /// <param name="enableAudioVbrEncoding">Optional. Whether to enable Audio Encoding.</param>
     /// <response code="200">Video stream returned.</response>
     /// <returns>A <see cref="FileResult"/> containing the audio file.</returns>
@@ -604,6 +608,7 @@ public class VideosController : BaseJellyfinApiController
         [FromQuery] int? videoStreamIndex,
         [FromQuery] EncodingContext? context,
         [FromQuery] Dictionary<string, string> streamOptions,
+        [FromQuery] bool requireAudioDynamicRange,
         [FromQuery] bool enableAudioVbrEncoding = true)
     {
         return GetVideoStream(
@@ -657,6 +662,7 @@ public class VideosController : BaseJellyfinApiController
             videoStreamIndex,
             context,
             streamOptions,
+            requireAudioDynamicRange,
             enableAudioVbrEncoding);
     }
 }
