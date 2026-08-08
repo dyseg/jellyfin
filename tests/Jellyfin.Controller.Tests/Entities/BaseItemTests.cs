@@ -4,10 +4,13 @@ using System.Linq;
 using System.Reflection;
 using System.Threading;
 using Jellyfin.Database.Implementations.Entities;
+using MediaBrowser.Controller.Configuration;
 using MediaBrowser.Controller.Entities;
+using MediaBrowser.Controller.Entities.Movies;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.LiveTv;
 using MediaBrowser.Controller.MediaSegments;
+using MediaBrowser.Model.Configuration;
 using MediaBrowser.Model.Dto;
 using MediaBrowser.Model.Entities;
 using MediaBrowser.Model.MediaInfo;
@@ -27,6 +30,35 @@ public class BaseItemTests
     [InlineData("1test 2", "0000000001test 0000000002")]
     public void BaseItem_ModifySortChunks_Valid(string input, string expected)
         => Assert.Equal(expected, BaseItem.ModifySortChunks(input));
+
+    [Theory]
+    [InlineData("The Matrix", "matrix")]
+    [InlineData("Spider-Man", "spiderman")]
+    [InlineData("A Movie: Part 2", "movie: part 0000000002")]
+    public void GetSortName_AppliesConfiguredCleaning(string input, string expected)
+        => Assert.Equal(expected, BaseItem.GetSortName(input, true, new ServerConfiguration()));
+
+    [Fact]
+    public void GetSortName_WithoutAlphaNumericSorting_ReturnsTrimmedInput()
+        => Assert.Equal("The Matrix", BaseItem.GetSortName("  The Matrix", false, new ServerConfiguration()));
+
+    [Fact]
+    public void SortName_ForcedSortName_IsCleanedLikeAutoSortName()
+    {
+        var configManager = new Mock<IServerConfigurationManager>();
+        configManager.Setup(x => x.Configuration).Returns(new ServerConfiguration());
+        BaseItem.ConfigurationManager = configManager.Object;
+
+        const string Raw = "The Spider-Man: Homecoming";
+
+        var auto = new Video { Name = Raw };
+        var forced = new Video { Name = "zzz unrelated name", ForcedSortName = Raw };
+
+        // A forced sort name must be cleaned the same way as an auto-generated one so both sort together (#17388).
+        Assert.Equal(auto.SortName, forced.SortName);
+        // Sanity: cleaning actually ran (leading article and hyphen removed, colon kept, lowercased).
+        Assert.Equal("spiderman: homecoming", forced.SortName);
+    }
 
     [Theory]
     [InlineData("/Movies/Ted/Ted.mp4", "/Movies/Ted/Ted - Unrated Edition.mp4", "Ted", "Unrated Edition")]
@@ -334,5 +366,145 @@ public class BaseItemTests
             Assert.Contains(alt1.Id, ids);
             Assert.Contains(alt2.Id, ids);
         }
+    }
+
+    [Fact]
+    public void InheritDatesFromOwner_OwnerHasDates_OverwritesOwnedItemDates()
+    {
+        var owner = new Movie
+        {
+            ProductionYear = 1982,
+            PremiereDate = new DateTime(1982, 6, 25, 0, 0, 0, DateTimeKind.Utc)
+        };
+
+        // 2016 is what the container creation date of a re-encoded trailer would have yielded.
+        var trailer = new Trailer
+        {
+            ExtraType = ExtraType.Trailer,
+            ProductionYear = 2016,
+            PremiereDate = new DateTime(2016, 5, 4, 0, 0, 0, DateTimeKind.Utc)
+        };
+
+        Assert.True(BaseItem.InheritDatesFromOwner(owner, trailer));
+        Assert.Equal(owner.ProductionYear, trailer.ProductionYear);
+        Assert.Equal(owner.PremiereDate, trailer.PremiereDate);
+    }
+
+    [Fact]
+    public void InheritDatesFromOwner_OwnerHasNoDates_KeepsOwnedItemDates()
+    {
+        var owner = new Movie();
+        var trailer = new Trailer
+        {
+            ExtraType = ExtraType.Trailer,
+            ProductionYear = 1982,
+            PremiereDate = new DateTime(1982, 6, 25, 0, 0, 0, DateTimeKind.Utc)
+        };
+
+        Assert.False(BaseItem.InheritDatesFromOwner(owner, trailer));
+        Assert.Equal(1982, trailer.ProductionYear);
+        Assert.Equal(new DateTime(1982, 6, 25, 0, 0, 0, DateTimeKind.Utc), trailer.PremiereDate);
+    }
+
+    [Fact]
+    public void InheritDatesFromOwner_DatesAlreadyMatch_ReportsNoChange()
+    {
+        var owner = new Movie
+        {
+            ProductionYear = 1982,
+            PremiereDate = new DateTime(1982, 6, 25, 0, 0, 0, DateTimeKind.Utc)
+        };
+
+        var trailer = new Trailer
+        {
+            ExtraType = ExtraType.Trailer,
+            ProductionYear = owner.ProductionYear,
+            PremiereDate = owner.PremiereDate
+        };
+
+        Assert.False(BaseItem.InheritDatesFromOwner(owner, trailer));
+    }
+
+    [Fact]
+    public void InheritDatesFromOwner_OwnedItemHasNoDates_TakesOwnerDates()
+    {
+        var owner = new Movie
+        {
+            ProductionYear = 1982,
+            PremiereDate = new DateTime(1982, 6, 25, 0, 0, 0, DateTimeKind.Utc)
+        };
+
+        var trailer = new Trailer
+        {
+            ExtraType = ExtraType.Trailer
+        };
+
+        Assert.True(BaseItem.InheritDatesFromOwner(owner, trailer));
+        Assert.Equal(1982, trailer.ProductionYear);
+        Assert.Equal(new DateTime(1982, 6, 25, 0, 0, 0, DateTimeKind.Utc), trailer.PremiereDate);
+    }
+
+    [Theory]
+    // An extra named after a version belongs to that version, not to the primary whose name it
+    // also starts with
+    [InlineData("/Movies/Movie/Movie - 4K-trailer.mkv", 2)]
+    [InlineData("/Movies/Movie/Movie - 1080p-behindthescenes.mkv", 1)]
+    // Named after the movie rather than one of its versions
+    [InlineData("/Movies/Movie/Movie-trailer.mkv", 0)]
+    // In an extras folder, so named after nothing in particular
+    [InlineData("/Movies/Movie/trailers/Official.mkv", 0)]
+    // A version name is only a match when it is followed by the extra's own suffix
+    [InlineData("/Movies/Movie/Movie - 4Kish-trailer.mkv", 0)]
+    public void GetOwnerIdForExtra_AssignsExtraToItsVersion(string extraPath, int expectedVersion)
+    {
+        var (primary, alt1, alt2) = SetupVersionGroup();
+        var expectedId = expectedVersion switch
+        {
+            1 => alt1.Id,
+            2 => alt2.Id,
+            _ => primary.Id
+        };
+
+        var method = typeof(Video).GetMethod("GetOwnerIdForExtra", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+
+        var ownerId = (Guid)method!.Invoke(primary, [new Video { Id = Guid.NewGuid(), Path = extraPath }])!;
+
+        Assert.Equal(expectedId, ownerId);
+    }
+
+    [Fact]
+    public void GetExtraOwnerIds_FromAnyVersion_CoversEveryVersion()
+    {
+        var (primary, alt1, alt2) = SetupVersionGroup();
+
+        var method = typeof(Video).GetMethod("GetExtraOwnerIds", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+
+        // An extra is owned by the one version it is named after, and the extras of the movie as a
+        // whole are owned by the primary, so every version has to read all of them back
+        foreach (var version in new[] { primary, alt1, alt2 })
+        {
+            var ids = (Guid[])method!.Invoke(version, null)!;
+
+            Assert.Equal(3, ids.Length);
+            Assert.Contains(primary.Id, ids);
+            Assert.Contains(alt1.Id, ids);
+            Assert.Contains(alt2.Id, ids);
+        }
+    }
+
+    [Fact]
+    public void GetOwnedVersionIds_CoversEveryLocalVersion()
+    {
+        var (primary, alt1, alt2) = SetupVersionGroup();
+
+        var method = typeof(Video).GetMethod("GetOwnedVersionIds", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+
+        // The extras of all versions are maintained together, so all of them have to be read back
+        var ids = (Guid[])method!.Invoke(primary, null)!;
+
+        Assert.Equal([primary.Id, alt1.Id, alt2.Id], ids);
     }
 }
