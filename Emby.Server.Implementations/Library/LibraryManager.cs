@@ -412,6 +412,13 @@ namespace Emby.Server.Implementations.Library
             }
 
             _persistenceService.DeleteItem([.. pathMaps.Select(f => f.Item.Id)]);
+
+            // Evict the deleted items from the cache and announce each removal.
+            foreach (var (item, _, _) in pathMaps)
+            {
+                _cache.TryRemove(item.Id, out _);
+                ReportItemRemoved(item, item.GetOwner() ?? item.GetParent());
+            }
         }
 
         public void DeleteItem(BaseItem item, DeleteOptions options, BaseItem parent, bool notifyParentItem)
@@ -609,6 +616,12 @@ namespace Emby.Server.Implementations.Library
             {
                 folder.Children = null;
                 folder.UserData = null;
+            }
+
+            // Announce the descendants before the item itself.
+            foreach (var child in children)
+            {
+                ReportItemRemoved(child, item);
             }
 
             ReportItemRemoved(item, parent);
@@ -2235,6 +2248,12 @@ namespace Emby.Server.Implementations.Library
         }
 
         /// <inheritdoc />
+        public IReadOnlySet<Guid> GetItemIdsWithAlternateVersions(IReadOnlyList<Guid> itemIds)
+        {
+            return _linkedChildrenService.GetItemIdsWithAlternateVersions(itemIds);
+        }
+
+        /// <inheritdoc />
         public void UpsertLinkedChild(Guid parentId, Guid childId, MediaBrowser.Controller.Entities.LinkedChildType childType)
         {
             _linkedChildrenService.UpsertLinkedChild(parentId, childId, childType);
@@ -2376,6 +2395,7 @@ namespace Emby.Server.Implementations.Library
                             {
                                 altVideo.OwnerId = video.Id;
                                 altVideo.SetPrimaryVersionId(video.Id);
+                                altVideo.IsInMixedFolder = video.IsInMixedFolder;
                                 // ResolveAlternateVersion only sees the alternate's primary file.
                                 // If the alternate is itself a stack (e.g. 1080p part1 + part2),
                                 // detect its parts from sibling files so its AdditionalParts persist.
@@ -2561,6 +2581,8 @@ namespace Emby.Server.Implementations.Library
                 item.DateLastSaved = DateTime.UtcNow;
             }
 
+            ForgetDroppedLocalAlternateVersions(items);
+
             // Resolve and add any local alternate version items that don't exist yet
             // This ensures they exist in the database when LinkedChildren are processed
             var allItems = new List<BaseItem>(items);
@@ -2589,6 +2611,7 @@ namespace Emby.Server.Implementations.Library
                             {
                                 altVideo.OwnerId = video.Id;
                                 altVideo.SetPrimaryVersionId(video.Id);
+                                altVideo.IsInMixedFolder = video.IsInMixedFolder;
                                 // ResolveAlternateVersion only sees the alternate's primary file.
                                 // If the alternate is itself a stack (e.g. 1080p part1 + part2),
                                 // detect its parts from sibling files so its AdditionalParts persist.
@@ -2648,6 +2671,30 @@ namespace Emby.Server.Implementations.Library
         /// <inheritdoc />
         public Task UpdateItemAsync(BaseItem item, BaseItem parent, ItemUpdateType updateReason, CancellationToken cancellationToken)
             => UpdateItemsAsync([item], parent, updateReason, cancellationToken);
+
+        /// <summary>
+        /// Forgets the cached local alternate versions of the supplied items that they no longer list.
+        /// </summary>
+        /// <param name="items">The items about to be saved.</param>
+        private void ForgetDroppedLocalAlternateVersions(IReadOnlyList<BaseItem> items)
+        {
+            foreach (var video in items.OfType<Video>())
+            {
+                var videoType = video.GetType();
+                var keptIds = video.LocalAlternateVersions
+                    .Where(path => !string.IsNullOrEmpty(path))
+                    .Select(path => GetNewItemId(path, videoType))
+                    .ToHashSet();
+
+                foreach (var versionId in GetLocalAlternateVersionIds(video))
+                {
+                    if (!keptIds.Contains(versionId))
+                    {
+                        _cache.TryRemove(versionId, out _);
+                    }
+                }
+            }
+        }
 
         /// <inheritdoc />
         public async Task ReattachUserDataAsync(BaseItem item, CancellationToken cancellationToken)
@@ -3507,6 +3554,12 @@ namespace Emby.Server.Implementations.Library
         public IReadOnlyDictionary<Guid, IReadOnlyList<string>> GetPeopleNamesByItems(IReadOnlyList<Guid> itemIds, IReadOnlyList<string> personTypes)
         {
             return _peopleRepository.GetPeopleNamesByItems(itemIds, personTypes);
+        }
+
+        /// <inheritdoc/>
+        public IReadOnlyDictionary<Guid, IReadOnlyList<PersonInfo>> GetPeopleByItems(IReadOnlyList<Guid> itemIds)
+        {
+            return _peopleRepository.GetPeopleByItems(itemIds);
         }
 
         public void UpdatePeople(BaseItem item, List<PersonInfo> people)

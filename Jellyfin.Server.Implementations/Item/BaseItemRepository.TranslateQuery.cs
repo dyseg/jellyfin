@@ -356,7 +356,7 @@ public sealed partial class BaseItemRepository
             }
             else
             {
-                baseQuery = baseQuery.Where(e => e.StartDate > now && e.EndDate < now);
+                baseQuery = baseQuery.Where(e => e.StartDate > now || e.EndDate < now);
             }
         }
 
@@ -370,14 +370,16 @@ public sealed partial class BaseItemRepository
                     p => p.Name,
                     (b, p) => p.Id);
 
+            var personTypes = filter.PersonTypes;
             baseQuery = baseQuery
                 .Where(e => context.PeopleBaseItemMap
-                    .Any(m => m.ItemId == e.Id && peopleEntityIds.Contains(m.PeopleId)));
+                    .Any(m => m.ItemId == e.Id && peopleEntityIds.Contains(m.PeopleId) && (personTypes.Length == 0 || personTypes.Contains(m.People.PersonType))));
         }
 
         if (!string.IsNullOrWhiteSpace(filter.Person))
         {
-            baseQuery = baseQuery.Where(e => e.Peoples!.Any(f => f.People.Name == filter.Person));
+            var personTypes = filter.PersonTypes;
+            baseQuery = baseQuery.Where(e => e.Peoples!.Any(f => f.People.Name == filter.Person && (personTypes.Length == 0 || personTypes.Contains(f.People.PersonType))));
         }
 
         if (!string.IsNullOrWhiteSpace(filter.ExternalSeriesId))
@@ -499,16 +501,21 @@ public sealed partial class BaseItemRepository
             var inProgress = context.UserData
                 .Where(ud => ud.UserId == userId && ud.PlaybackPositionTicks > 0);
 
-            // Folders are resumable when a descendant is in progress, or when they hold both played and
-            // unplayed descendants (partially watched). Alternate versions keep their own progress, so
-            // they count towards the in-progress check but not towards the played/unplayed one.
+            // Series and Seasons are resumable when a descendant is in progress, or when they hold both
+            // played and unplayed descendants (partially watched). Alternate versions keep their own
+            // progress, so they count towards the in-progress check but not towards the played/unplayed one.
             var leafItems = GetAccessFilteredLeafItemsQuery(context, filter.User!);
             var inProgressLeafItems = GetAccessFilteredLeafItemsQuery(context, filter.User!, includeOwnedItems: true)
                 .Where(e => e.UserData!.Any(ud => ud.UserId == userId && ud.PlaybackPositionTicks > 0));
 
-            var folderResumableFilter = BuildHasDescendantFilter(context, inProgressLeafItems)
-                .Or(BuildHasDescendantFilter(context, leafItems.Where(e => e.UserData!.Any(ud => ud.UserId == userId && ud.Played)))
-                    .And(BuildHasDescendantFilter(context, leafItems.Where(e => !e.UserData!.Any(ud => ud.UserId == userId && ud.Played)))));
+            // Every other folder kind is a container rather than one continuous piece of media
+            var resumableFolderTypes = _resumableFolderKinds
+                .Select(kind => _itemTypeLookup.BaseItemKindNames.GetValueOrDefault(kind))
+                .ToArray();
+            var folderIsResumableFilter = IsFolderFilter.And(e => resumableFolderTypes.Contains(e.Type))
+                .And(BuildHasDescendantFilter(context, inProgressLeafItems)
+                    .Or(BuildHasDescendantFilter(context, leafItems.Where(e => e.UserData!.Any(ud => ud.UserId == userId && ud.Played)))
+                        .And(BuildHasDescendantFilter(context, leafItems.Where(e => !e.UserData!.Any(ud => ud.UserId == userId && ud.Played))))));
 
             if (isResumable)
             {
@@ -516,7 +523,7 @@ public sealed partial class BaseItemRepository
                 // Match each version on its own progress rather than coalescing onto the primary.
                 var inProgressIds = inProgress.Select(ud => ud.ItemId);
 
-                baseQuery = baseQuery.Where(IsFolderFilter.And(folderResumableFilter)
+                baseQuery = baseQuery.Where(folderIsResumableFilter
                     .Or(IsFolderFilter.Not().And(e => inProgressIds.Contains(e.Id))));
 
                 // When several versions of the same item are in progress, keep only the most recently played one, use id as tiebreaker.
@@ -543,14 +550,14 @@ public sealed partial class BaseItemRepository
                 var resumableMovieIds = inProgress
                     .Join(context.BaseItems, ud => ud.ItemId, bi => bi.Id, (ud, bi) => bi.PrimaryVersionId ?? bi.Id);
 
-                baseQuery = baseQuery.Where(IsFolderFilter.And(folderResumableFilter.Not())
+                baseQuery = baseQuery.Where(IsFolderFilter.And(folderIsResumableFilter.Not())
                     .Or(IsFolderFilter.Not().And(e => !resumableMovieIds.Contains(e.Id))));
             }
         }
 
         if (filter.ArtistIds.Length > 0)
         {
-            baseQuery = baseQuery.WhereReferencedItemMultipleTypes(context, [ItemValueType.Artist, ItemValueType.AlbumArtist], filter.ArtistIds);
+            baseQuery = baseQuery.WhereReferencedItem(context, [ItemValueType.Artist, ItemValueType.AlbumArtist], filter.ArtistIds);
         }
 
         if (filter.AlbumArtistIds.Length > 0)
@@ -581,12 +588,12 @@ public sealed partial class BaseItemRepository
 
         if (filter.ExcludeArtistIds.Length > 0)
         {
-            baseQuery = baseQuery.WhereReferencedItemMultipleTypes(context, [ItemValueType.Artist, ItemValueType.AlbumArtist], filter.ExcludeArtistIds, true);
+            baseQuery = baseQuery.WhereReferencedItem(context, [ItemValueType.Artist, ItemValueType.AlbumArtist], filter.ExcludeArtistIds, true);
         }
 
         if (filter.GenreIds.Count > 0)
         {
-            baseQuery = baseQuery.WhereReferencedItem(context, ItemValueType.Genre, filter.GenreIds.ToArray());
+            baseQuery = baseQuery.WhereReferencedItem(context, ItemValueType.Genre, filter.GenreIds);
         }
 
         if (filter.Genres.Count > 0)
@@ -612,7 +619,7 @@ public sealed partial class BaseItemRepository
 
         if (filter.StudioIds.Length > 0)
         {
-            baseQuery = baseQuery.WhereReferencedItem(context, ItemValueType.Studios, filter.StudioIds.ToArray());
+            baseQuery = baseQuery.WhereReferencedItem(context, ItemValueType.Studios, filter.StudioIds);
         }
 
         if (filter.OfficialRatings.Length > 0)
@@ -958,17 +965,6 @@ public sealed partial class BaseItemRepository
             baseQuery = baseQuery.WhereHasAnyProviderIds(filter.HasAnyProviderIds);
         }
 
-        if (filter.HasAnyProviderIds is not null && filter.HasAnyProviderIds.Count > 0)
-        {
-            var includeAny = filter.HasAnyProviderIds
-                .SelectMany(kvp => kvp.Value.Select(v => $"{kvp.Key}:{v}"))
-                .ToArray();
-            if (includeAny.Length > 0)
-            {
-                baseQuery = baseQuery.Where(e => e.Provider!.Select(f => f.ProviderId + ":" + f.ProviderValue)!.Any(f => includeAny.Contains(f)));
-            }
-        }
-
         if (filter.HasImdbId.HasValue)
         {
             baseQuery = filter.HasImdbId.Value
@@ -990,21 +986,7 @@ public sealed partial class BaseItemRepository
                 : baseQuery.Where(e => e.Provider!.All(f => f.ProviderId.ToLower() != TvdbProviderName));
         }
 
-        var queryTopParentIds = filter.TopParentIds;
-
-        if (queryTopParentIds.Length > 0)
-        {
-            var includedItemByNameTypes = GetItemByNameTypesInQuery(filter);
-            var enableItemsByName = (filter.IncludeItemsByName ?? false) && includedItemByNameTypes.Count > 0;
-            if (enableItemsByName && includedItemByNameTypes.Count > 0)
-            {
-                baseQuery = baseQuery.Where(e => includedItemByNameTypes.Contains(e.Type) || queryTopParentIds.Any(w => w == e.TopParentId!.Value));
-            }
-            else
-            {
-                baseQuery = baseQuery.WhereOneOrMany(queryTopParentIds, e => e.TopParentId!.Value);
-            }
-        }
+        baseQuery = ApplyTopParentFiltering(context, baseQuery, filter);
 
         if (filter.AncestorIds.Length > 0)
         {
